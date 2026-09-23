@@ -20,5 +20,9 @@
     // TS 6 no longer auto-includes every @types package, so global types must be listed.
     "types": ["node", "jest"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  // ts-node's CommonJS loader does not follow node16's .js → .ts import rewrite.
+  "ts-node": {
+    "experimentalResolver": true
+  }
 }
