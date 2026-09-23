@@ -1,0 +1,17 @@
+{
+  // Stops ESLint from merging configs from parent directories.
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    // Must stay last so it can turn off formatting rules from the configs above.
+    "prettier"
+  ],
+  "env": {
+    "node": true,
+    "jest": true
+  },
+  "ignorePatterns": ["dist/", "coverage/"]
+}

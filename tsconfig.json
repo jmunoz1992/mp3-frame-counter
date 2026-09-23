@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    // node16 emits CommonJS here (package.json "type": "commonjs"); TS 6 deprecates the older "node10" resolution.
+    "module": "node16",
+    "moduleResolution": "node16",
+    "outDir": "dist",
+    // TS 6 requires an explicit rootDir alongside outDir; tsconfig.build.json narrows it to "src".
+    "rootDir": ".",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    // Required by ts-jest with node16 modules; also flags code that per-file transpilers (ts-node-dev --transpile-only) mishandle.
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+    // TS 6 no longer auto-includes every @types package, so global types must be listed.
+    "types": ["node", "jest"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}

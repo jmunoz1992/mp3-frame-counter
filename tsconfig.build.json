@@ -1,0 +1,9 @@
+{
+  // Compiles only src with rootDir "src" so output lands at dist/server.js rather than dist/src/server.js.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"]
+}
