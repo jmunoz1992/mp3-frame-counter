@@ -1,0 +1,101 @@
+import {
+  FrameCounter,
+  countFramesInBuffer,
+} from '../../src/mp3/FrameCounter.js';
+import { Mp3ParseError } from '../../src/mp3/types.js';
+import { buildFrame, buildMp3, type FrameSpec } from '../helpers/buildMp3.js';
+
+const CBR_FRAME: FrameSpec = { bitrateKbps: 128, sampleRateHz: 44100 };
+
+function id3v2Tag(body: Buffer): Buffer {
+  const header = Buffer.alloc(10);
+  header.write('ID3', 0, 'ascii');
+  header[3] = 0x04;
+
+  let size = body.length;
+  for (let i = 3; i >= 0; i--) {
+    header[6 + i] = size & 0x7f;
+    size >>= 7;
+  }
+
+  return Buffer.concat([header, body]);
+}
+
+describe('countFramesInBuffer', () => {
+  it('counts a single frame', () => {
+    const buffer = buildMp3([buildFrame(CBR_FRAME)]);
+
+    expect(countFramesInBuffer(buffer)).toBe(1);
+  });
+
+  it('counts 50 frames at a constant bitrate', () => {
+    const buffer = buildMp3(
+      Array.from({ length: 50 }, () => buildFrame(CBR_FRAME)),
+    );
+
+    expect(countFramesInBuffer(buffer)).toBe(50);
+  });
+
+  it('counts frames with varying bitrates', () => {
+    const bitrates = [96, 128, 160, 192, 256, 320, 128, 192];
+    const buffer = buildMp3(
+      bitrates.map((bitrateKbps) =>
+        buildFrame({ bitrateKbps, sampleRateHz: 44100 }),
+      ),
+    );
+
+    expect(countFramesInBuffer(buffer)).toBe(bitrates.length);
+  });
+
+  it('skips a leading ID3v2 tag before counting', () => {
+    const hiddenInTag = buildFrame({ bitrateKbps: 128, sampleRateHz: 44100 });
+    const audio = buildMp3([
+      buildFrame({ bitrateKbps: 192, sampleRateHz: 44100 }),
+      buildFrame({ bitrateKbps: 160, sampleRateHz: 44100 }),
+      buildFrame({ bitrateKbps: 320, sampleRateHz: 44100 }),
+    ]);
+    const buffer = Buffer.concat([id3v2Tag(hiddenInTag), audio]);
+
+    expect(countFramesInBuffer(buffer)).toBe(3);
+  });
+
+  it('throws Mp3ParseError when the buffer has no valid frames', () => {
+    const buffer = Buffer.from([0xff, 0xe0, 0x00, 0x00, 0x11, 0x22, 0x33]);
+
+    expect(() => countFramesInBuffer(buffer)).toThrow(Mp3ParseError);
+  });
+});
+
+describe('FrameCounter', () => {
+  it('returns the same count for one write, byte-at-a-time writes, and 37-byte chunks', () => {
+    const frameCount = 30;
+    const bitrates = [96, 128, 160, 192, 256, 320];
+    const buffer = buildMp3(
+      Array.from({ length: frameCount }, (_, index) =>
+        buildFrame({
+          bitrateKbps: bitrates[index % bitrates.length],
+          sampleRateHz: 44100,
+          padded: index % 3 === 0,
+        }),
+      ),
+    );
+
+    const allAtOnce = new FrameCounter();
+    allAtOnce.write(buffer);
+
+    const oneByteAtATime = new FrameCounter();
+    for (let offset = 0; offset < buffer.length; offset++) {
+      oneByteAtATime.write(buffer.subarray(offset, offset + 1));
+    }
+
+    const oddChunks = new FrameCounter();
+    const chunkSize = 37;
+    for (let offset = 0; offset < buffer.length; offset += chunkSize) {
+      oddChunks.write(buffer.subarray(offset, offset + chunkSize));
+    }
+
+    expect(allAtOnce.finish()).toBe(frameCount);
+    expect(oneByteAtATime.finish()).toBe(frameCount);
+    expect(oddChunks.finish()).toBe(frameCount);
+  });
+});
