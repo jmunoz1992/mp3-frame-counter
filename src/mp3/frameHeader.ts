@@ -73,7 +73,8 @@ export function parseFrameHeader(
     return null;
   }
 
-  // Protection (byte 1 bit 0) and private (byte 2 bit 0) are unused.
+  // Private (byte 2 bit 0) is unused. Protection (byte 1 bit 0) only
+  // changes where a Xing tag sits; see isXingVbrHeader.
   const frameLength =
     Math.floor((144 * bitrateKbps * 1000) / sampleRateHz) + (padded ? 1 : 0);
 
@@ -84,4 +85,38 @@ export function parseFrameHeader(
     padded,
     channelMode,
   };
+}
+
+const XING_TAG = 'Xing';
+const CRC_SIZE = 2;
+// MPEG-1 Layer III side info follows the header (and CRC, if present).
+const SIDE_INFO_SIZE_MONO = 17;
+const SIDE_INFO_SIZE_NOT_MONO = 32;
+
+/**
+ * True when the frame at `offset` is a Xing VBR header. The tag sits at the
+ * start of the audio data, immediately after the side information. CBR files
+ * use "Info" in that slot; those frames still carry audio and return false.
+ */
+export function isXingVbrHeader(
+  buffer: Buffer,
+  offset: number,
+  header: ParsedFrameHeader,
+): boolean {
+  const protectionBit = buffer[offset + 1] & 0x01;
+  const crcSize = protectionBit === 0 ? CRC_SIZE : 0;
+  const sideInfoSize =
+    header.channelMode === 'mono'
+      ? SIDE_INFO_SIZE_MONO
+      : SIDE_INFO_SIZE_NOT_MONO;
+  const tagOffset = offset + FRAME_HEADER_SIZE + crcSize + sideInfoSize;
+
+  if (tagOffset + XING_TAG.length > offset + header.frameLength) {
+    return false;
+  }
+
+  return (
+    buffer.toString('ascii', tagOffset, tagOffset + XING_TAG.length) ===
+    XING_TAG
+  );
 }

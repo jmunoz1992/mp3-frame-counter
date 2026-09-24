@@ -59,6 +59,30 @@ describe('countFramesInBuffer', () => {
     expect(countFramesInBuffer(buffer)).toBe(3);
   });
 
+  it('does not count a leading Xing VBR header frame', () => {
+    const audio = [
+      buildFrame({ bitrateKbps: 192, sampleRateHz: 44100 }),
+      buildFrame({ bitrateKbps: 160, sampleRateHz: 44100 }),
+    ];
+
+    expect(countFramesInBuffer(buildMp3([xingFrame(), ...audio]))).toBe(2);
+    expect(countFramesInBuffer(buildMp3([xingFrame('mono'), ...audio]))).toBe(
+      2,
+    );
+    expect(
+      countFramesInBuffer(buildMp3([xingFrame('stereo', true), ...audio])),
+    ).toBe(2);
+  });
+
+  it('counts a leading Info tag frame', () => {
+    const buffer = buildMp3([
+      tagFrame('Info'),
+      buildFrame({ bitrateKbps: 128, sampleRateHz: 44100 }),
+    ]);
+
+    expect(countFramesInBuffer(buffer)).toBe(2);
+  });
+
   it('throws Mp3ParseError when the buffer has no valid frames', () => {
     const buffer = Buffer.from([0xff, 0xe0, 0x00, 0x00, 0x11, 0x22, 0x33]);
 
@@ -98,4 +122,45 @@ describe('FrameCounter', () => {
     expect(oneByteAtATime.finish()).toBe(frameCount);
     expect(oddChunks.finish()).toBe(frameCount);
   });
+
+  it('skips a Xing header when that frame arrives in pieces', () => {
+    const buffer = buildMp3([
+      xingFrame(),
+      buildFrame(CBR_FRAME),
+      buildFrame(CBR_FRAME),
+    ]);
+    const counter = new FrameCounter();
+
+    for (let offset = 0; offset < buffer.length; offset += 50) {
+      counter.write(buffer.subarray(offset, offset + 50));
+    }
+
+    expect(counter.finish()).toBe(2);
+  });
 });
+
+function tagFrame(
+  tag: 'Xing' | 'Info',
+  channelMode: 'stereo' | 'mono' = 'stereo',
+  crc = false,
+): Buffer {
+  const frame = buildFrame({ bitrateKbps: 128, sampleRateHz: 44100 });
+  if (channelMode === 'mono') {
+    frame[3] = (frame[3] & 0x3f) | 0xc0;
+  }
+  if (crc) {
+    frame[1] &= ~0x01;
+  }
+
+  const sideInfoSize = channelMode === 'mono' ? 17 : 32;
+  const tagOffset = 4 + (crc ? 2 : 0) + sideInfoSize;
+  frame.write(tag, tagOffset, 'ascii');
+  return frame;
+}
+
+function xingFrame(
+  channelMode: 'stereo' | 'mono' = 'stereo',
+  crc = false,
+): Buffer {
+  return tagFrame('Xing', channelMode, crc);
+}

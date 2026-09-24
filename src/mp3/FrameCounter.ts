@@ -1,5 +1,5 @@
 import { FRAME_HEADER_SIZE } from './constants.js';
-import { parseFrameHeader } from './frameHeader.js';
+import { isXingVbrHeader, parseFrameHeader } from './frameHeader.js';
 import { ID3V2_HEADER_SIZE, readId3v2Header } from './id3.js';
 import { Mp3ParseError } from './types.js';
 
@@ -13,6 +13,7 @@ export class FrameCounter {
   private frameCount = 0;
   private id3Checked = false;
   private id3BytesRemainingToSkip = 0;
+  private firstFrameChecked = false;
 
   write(chunk: Buffer): void {
     let buffer = Buffer.concat([this.carry, chunk]);
@@ -54,6 +55,17 @@ export class FrameCounter {
 
       if (offset + header.frameLength > buffer.length) {
         break;
+      }
+
+      // The first frame of a VBR file is a Xing header: a valid MPEG frame
+      // that stores the index instead of audio. MediaInfo leaves it out of
+      // Frame count. A CBR "Info" tag lives in a real audio frame, so it counts.
+      if (!this.firstFrameChecked) {
+        this.firstFrameChecked = true;
+        if (isXingVbrHeader(buffer, offset, header)) {
+          offset += header.frameLength;
+          continue;
+        }
       }
 
       this.frameCount += 1;
