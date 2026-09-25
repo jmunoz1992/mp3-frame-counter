@@ -58,8 +58,9 @@ export class FrameCounter {
       }
 
       // The first frame of a VBR file is a Xing header: a valid MPEG frame
-      // that stores the index instead of audio. MediaInfo leaves it out of
-      // Frame count. A CBR "Info" tag lives in a real audio frame, so it counts.
+      // that stores the index instead of audio. Counts follow MediaInfo, which
+      // leaves a Xing frame out of Frame count but includes a CBR "Info"
+      // frame. ffprobe skips both, so it reports one fewer for LAME CBR files.
       if (!this.firstFrameChecked) {
         this.firstFrameChecked = true;
         if (isXingVbrHeader(buffer, offset, header)) {

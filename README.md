@@ -46,7 +46,7 @@ npm run typecheck
 
 `parseFrameHeader` reads a 4-byte MPEG header. It accepts the header when the 11-bit sync word is present (`0xFF` and the top three bits of the next byte), the version is MPEG-1, the layer is Layer III, the bitrate index maps to 32–320 kbps, and the sample rate is 44100, 48000, or 32000 Hz. Frame length is `floor(144 * bitrateKbps * 1000 / sampleRateHz)`, plus one byte when the padding bit is set. The counter advances by that length. Bytes that fail the header checks are skipped one at a time. A leading ID3v2 tag is skipped before the scan: its size is the synchsafe integer in the 10-byte header, plus a 10-byte footer when the footer flag is set.
 
-The first accepted frame is checked for a Xing VBR header. The ASCII tag `Xing` sits at the start of the audio data, after the 4-byte header, a 2-byte CRC when the protection bit is clear, and the side information (17 bytes for mono, 32 bytes otherwise). That frame is a valid MPEG frame whose payload is a VBR index, so it is left out of `frameCount`. ffprobe and MediaInfo leave this header frame out of their frame counts for the same reason. A CBR file may put an `Info` tag in that same slot; the frame still carries audio, so it stays in the count. A VBRI header is counted as an ordinary audio frame.
+`frameCount` matches MediaInfo's "Frame count". The first accepted frame is checked for a Xing VBR header. The ASCII tag `Xing` sits at the start of the audio data, after the 4-byte header, a 2-byte CRC when the protection bit is clear, and the side information (17 bytes for mono, 32 bytes otherwise). That frame is a valid MPEG frame whose payload is a VBR index, and MediaInfo leaves it out of its count, so it is left out of `frameCount`. LAME CBR files put an `Info` tag in that same slot. MediaInfo counts that frame, so it stays in `frameCount`. ffprobe skips both kinds of tag frame, so for a LAME CBR file it reports one fewer frame than this service and MediaInfo. A VBRI header is counted as an ordinary audio frame.
 
 `POST /file-upload` pipes the request into busboy. Each chunk of the `file` field is passed to `FrameCounter.write()`. A header, frame, or ID3 tag split across chunks stays in a carry buffer until a later chunk completes it. The whole file is never buffered.
 
@@ -54,7 +54,7 @@ The first accepted frame is checked for a Xing VBR header. The ASCII tag `Xing` 
 
 Error responses are JSON: `{ "error": "<message>" }`.
 
-- **400** when the request is not `multipart/form-data` (`Content-Type must be multipart/form-data`), the multipart body is malformed (`Malformed multipart/form-data request`), the `file` field is missing (`No file was found in the "file" form field`), or the upload contains no MPEG-1 Layer III frames (`No valid MPEG-1 Layer III frames found`).
+- **400** when the request is not `multipart/form-data` (`Content-Type must be multipart/form-data`), the multipart body is malformed or ends before its closing boundary (`Malformed multipart/form-data request...`), the `file` field is missing (`No file was found in the "file" form field`), or the upload contains no MPEG-1 Layer III frames (`No valid MPEG-1 Layer III frames found`).
 - **413** when the file is larger than `MAX_UPLOAD_SIZE_BYTES` (`File exceeds the <limit>-byte upload limit`).
 - **500** for any other failure (`Internal server error`). The error is logged on the server.
 
@@ -64,7 +64,18 @@ Unknown routes return **404** with the same JSON shape (`Cannot <method> <path>`
 
 - Free-format bitrate (bitrate index 0) is unsupported. The bitrate table has no rate for that index, so the header is rejected and a frame length cannot be computed.
 - There is no second-sync check. After a header yields a frame length, the parser advances by that length without confirming a sync word at the next frame.
-- A VBRI header frame is included in `frameCount`.
+- A VBRI header frame is included in `frameCount`. This has not been checked against MediaInfo because LAME cannot write VBRI headers.
+
+## Test fixtures
+
+`test/fixtures` holds three two-second LAME files, with expected counts taken from `mediainfo --Inform="Audio;%FrameCount%"`. To regenerate them:
+
+```bash
+ffmpeg -f lavfi -i "sine=frequency=440:duration=2" -ac 2 -ar 44100 tone.wav
+lame -b 128 --cbr --tt Tone --ta Test --add-id3v2 tone.wav cbr-128k-id3v2.mp3  # 79: ID3v2, Info frame, ID3v1
+lame -b 128 --cbr -t tone.wav cbr-128k-no-tag.mp3                              # 78: no tags, no Info frame
+lame -V 2 --tt Tone --add-id3v2 tone.wav vbr-v2-id3v2.mp3                      # 78: ID3v2, Xing frame, ID3v1
+```
 
 ## Project structure
 
@@ -87,4 +98,7 @@ test/
   mp3/frameHeader.test.ts      # header fields and rejected headers
   mp3/id3.test.ts              # synchsafe ID3v2 size
   helpers/buildMp3.ts          # synthetic MPEG frames for tests
+  fixtures/                    # real LAME-encoded MP3s
+scripts/
+  count-frames.ts              # count frames in a local file
 ```

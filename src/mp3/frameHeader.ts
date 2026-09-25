@@ -95,8 +95,9 @@ const SIDE_INFO_SIZE_NOT_MONO = 32;
 
 /**
  * True when the frame at `offset` is a Xing VBR header. The tag sits at the
- * start of the audio data, immediately after the side information. CBR files
- * use "Info" in that slot; those frames still carry audio and return false.
+ * start of the audio data, immediately after the side information. LAME CBR
+ * files use "Info" in that slot; MediaInfo counts those frames, so they return
+ * false.
  */
 export function isXingVbrHeader(
   buffer: Buffer,

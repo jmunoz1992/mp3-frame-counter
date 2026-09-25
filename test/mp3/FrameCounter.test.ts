@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   FrameCounter,
   countFramesInBuffer,
@@ -137,6 +139,33 @@ describe('FrameCounter', () => {
 
     expect(counter.finish()).toBe(2);
   });
+});
+
+// Expected counts are MediaInfo's "Frame count". ffprobe reports 78 for the
+// CBR file with a LAME Info frame because it skips that frame; MediaInfo
+// counts it. The README's "Test fixtures" section shows how they were made.
+describe('real LAME-encoded files', () => {
+  const fixtures = [
+    { file: 'cbr-128k-id3v2.mp3', frameCount: 79 },
+    { file: 'cbr-128k-no-tag.mp3', frameCount: 78 },
+    { file: 'vbr-v2-id3v2.mp3', frameCount: 78 },
+  ];
+
+  it.each(fixtures)(
+    '$file has $frameCount frames',
+    async ({ file, frameCount }) => {
+      const counter = new FrameCounter();
+      const stream = fs.createReadStream(
+        path.join(__dirname, '..', 'fixtures', file),
+        { highWaterMark: 1000 },
+      );
+      for await (const chunk of stream) {
+        counter.write(chunk as Buffer);
+      }
+
+      expect(counter.finish()).toBe(frameCount);
+    },
+  );
 });
 
 function tagFrame(
