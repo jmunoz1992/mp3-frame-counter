@@ -33,13 +33,25 @@ fileUploadRouter.post(
     const counter = new FrameCounter();
     let settled = false;
     let fileSeen = false;
-    let parseFailed = false;
     let fileTooLarge = false;
 
     const fail = (err: unknown) => {
       if (settled) return;
       settled = true;
       next(err);
+    };
+
+    // Busboy only errors on bodies it cannot parse, e.g. a form that ends
+    // before its closing boundary. That is the client's fault, not ours.
+    const failMalformed = (err: Error) => {
+      req.unpipe(bb);
+      req.resume();
+      fail(
+        new HttpError(
+          400,
+          `Malformed multipart/form-data request: ${err.message}`,
+        ),
+      );
     };
 
     bb.on('file', (name, file) => {
@@ -50,18 +62,12 @@ fileUploadRouter.post(
       fileSeen = true;
 
       file.on('data', (chunk: Buffer) => {
-        if (parseFailed) return;
-        try {
-          counter.write(chunk);
-        } catch (err) {
-          parseFailed = true;
-          fail(err);
-        }
+        counter.write(chunk);
       });
       file.on('limit', () => {
         fileTooLarge = true;
       });
-      file.on('error', fail);
+      file.on('error', failMalformed);
     });
 
     bb.on('close', () => {
@@ -96,11 +102,7 @@ fileUploadRouter.post(
       res.status(200).json({ frameCount });
     });
 
-    bb.on('error', (err) => {
-      req.unpipe(bb);
-      req.resume();
-      fail(err);
-    });
+    bb.on('error', failMalformed);
 
     req.pipe(bb);
   },

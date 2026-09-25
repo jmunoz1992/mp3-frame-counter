@@ -1,8 +1,10 @@
+import path from 'node:path';
 import request from 'supertest';
 import { createApp } from '../../src/app.js';
 import { buildFrame, buildMp3, type FrameSpec } from '../helpers/buildMp3.js';
 
 const CBR_FRAME: FrameSpec = { bitrateKbps: 128, sampleRateHz: 44100 };
+const FIXTURES_DIR = path.join(__dirname, '..', 'fixtures');
 
 const app = createApp();
 
@@ -37,6 +39,29 @@ describe('POST /file-upload', () => {
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: expect.any(String) });
+  });
+
+  it('returns the MediaInfo frame count for a real LAME-encoded MP3', async () => {
+    const res = await request(app)
+      .post('/file-upload')
+      .attach('file', path.join(FIXTURES_DIR, 'vbr-v2-id3v2.mp3'));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ frameCount: 78 });
+  });
+
+  it('returns 400 when the multipart body ends before its closing boundary', async () => {
+    const res = await request(app)
+      .post('/file-upload')
+      .set('Content-Type', 'multipart/form-data; boundary=abc')
+      .send(
+        '--abc\r\nContent-Disposition: form-data; name="file"; filename="song.mp3"\r\n\r\npartial',
+      );
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: expect.stringMatching(/^Malformed multipart\/form-data request/),
+    });
   });
 
   it('returns 400 when the file is not an MP3', async () => {
