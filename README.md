@@ -27,11 +27,11 @@ The server listens on port 3000. Set `PORT` to use another port. The upload limi
 With the server running:
 
 ```bash
-curl -s -F "file=@song.mp3" http://localhost:3000/file-upload
+curl -s -F "file=@test/fixtures/vbr-v2-id3v2.mp3" http://localhost:3000/file-upload
 ```
 
 ```json
-{ "frameCount": 1234 }
+{ "frameCount": 78 }
 ```
 
 ## Running the automated tests
