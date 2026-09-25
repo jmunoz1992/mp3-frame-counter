@@ -11,7 +11,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
-    // Required by ts-jest with node16 modules; also flags code that per-file transpilers (ts-node-dev --transpile-only) mishandle.
+    // Required by ts-jest with node16 modules; also flags code that per-file transpilers (tsx) mishandle.
     "isolatedModules": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -20,9 +20,5 @@
     // TS 6 no longer auto-includes every @types package, so global types must be listed.
     "types": ["node", "jest"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
-  // ts-node's CommonJS loader does not follow node16's .js → .ts import rewrite.
-  "ts-node": {
-    "experimentalResolver": true
-  }
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }
