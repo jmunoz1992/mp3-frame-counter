@@ -1,12 +1,15 @@
 {
   "name": "mp3-frame-counter",
   "version": "1.0.0",
-  "description": "",
+  "description": "Express API that counts MPEG-1 Layer III frames in an uploaded MP3",
   "main": "dist/server.js",
+  "engines": {
+    "node": ">=18.14"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "dev": "tsx watch src/server.ts",
     "test": "jest",
     "lint": "eslint --ext .ts --no-error-on-unmatched-pattern src test",
     "typecheck": "tsc --noEmit",
@@ -18,10 +21,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@fastify/multipart": "^10.1.2",
     "busboy": "^1.6.0",
-    "express": "^5.2.1",
-    "fastify": "^5.12.5"
+    "express": "^5.2.1"
   },
   "devDependencies": {
     "@types/busboy": "^1.5.4",
@@ -37,9 +38,7 @@
     "prettier": "^3.9.9",
     "supertest": "^7.3.0",
     "ts-jest": "^29.4.13",
-    "ts-node-dev": "^2.0.0",
     "tsx": "^4.23.15",
-    "typescript": "~6.0.3",
-    "vitest": "^5.0.1"
+    "typescript": "~6.0.3"
   }
 }
